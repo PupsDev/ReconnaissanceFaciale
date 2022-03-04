@@ -20,3 +20,7 @@ https://medium.com/softway-blog/building-a-facial-recognition-machine-learning-m
 # Ressource 
 https://imerit.net/blog/5-million-faces-top-14-free-image-datasets-for-facial-recognition-all-pbm/https://imerit.net/blog/5-million-faces-top-14-free-image-datasets-for-facial-recognition-all-pbm/
 https://analyticsindiamag.com/10-face-datasets-to-start-facial-recognition-projects/
+
+## ouverture ?
+https://www.sciencedirect.com/science/article/abs/pii/S0031320304003991
+ 

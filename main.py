@@ -9,7 +9,8 @@ while(True):
 	
     # Capture the video frame
     # by frame
-    ret, frame = vid.read()
+    #ret, frame = vid.read()
+    frame = cv2.imread('ressource/dataset/sylvain.jpg') 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # Detect faces
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
