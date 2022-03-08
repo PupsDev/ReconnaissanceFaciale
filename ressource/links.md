@@ -4,6 +4,7 @@
 # Face recognition :
 
 ## Eigenfaces:
+original paper : http://www.mit.edu/~9.54/fall14/Classes/class10/Turk%20Pentland%20Eigenfaces.pdf 
 
 https://pyimagesearch.com/2021/05/10/opencv-eigenfaces-for-face-recognition/
 https://learnopencv.com/eigenface-using-opencv-c-python/
@@ -20,6 +21,11 @@ https://medium.com/softway-blog/building-a-facial-recognition-machine-learning-m
 # Ressource 
 https://imerit.net/blog/5-million-faces-top-14-free-image-datasets-for-facial-recognition-all-pbm/https://imerit.net/blog/5-million-faces-top-14-free-image-datasets-for-facial-recognition-all-pbm/
 https://analyticsindiamag.com/10-face-datasets-to-start-facial-recognition-projects/
+
+
+# Improve
+perspective
+https://www.sciencedirect.com/science/article/pii/S0042698903004292
 
 ## ouverture ?
 https://www.sciencedirect.com/science/article/abs/pii/S0031320304003991
