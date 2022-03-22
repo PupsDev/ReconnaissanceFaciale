@@ -15,8 +15,16 @@ import scipy.io
 import cv2
 import sys
 
+from tkinter import *
+from tkinter import filedialog as fd
+from PIL import Image, ImageTk
+
+from functools import partial
+
+
 n = 99
 noms = ["gauthier","albena","mathieu","alexandre F", "dorian","thomas ?", "erwan","ange","roland","aurelien","samuel","alexandre S","florentin","sylvain","khélian","camille","marius","alexandre L","thomas S","maxime"]
+
 def loadImages():
     """On charge notre dataset des étudiants d'imagine en gardant les (n-1) premiers donc 95 images sur 100 images. (Il y a 5 images par étudiant)"""
 
@@ -50,25 +58,26 @@ def preProcess(imgs):
     numpy_array = numpy_array - np.tile(average,(numpy_array.shape[0],1))
     
     return numpy_array, average
-def load(filepath):
+def load(filepath, average):
     img =cv2.imread(filepath)
+    img = crop(filepath)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
     testFaceMS = np.ndarray.flatten(gray)-average
     return testFaceMS
 
 def display(reconFace):
     img = plt.imshow(np.reshape(reconFace,(64,64)))
     img.set_cmap('gray')
-    plt.title('r = ' + str(r))
+    #plt.title('r = ' + str(r))
     plt.axis('off')
     plt.show()
 
 
-def computeDistances(testFaceMS,r):
+def computeDistances(testFaceMS,r,seuil,U,numpy_array):
     """Dernière étape on calcule les poids de chaque image du dataset et on calcule la distance du visage inconnu à celui de tous les visages connus.
 
     """
-    seuil = 900
     w = testFaceMS @ U[:,:r]
     weights = []
     distances =[]
@@ -76,8 +85,8 @@ def computeDistances(testFaceMS,r):
         weight = image @ U[:,:r]
         dist = np.linalg.norm(weight-w)
         distances.append((dist,ind))
-        #if dist<seuil :
-            #print(str(ind+1)+":"+str(dist))
+        # if dist<seuil :
+        #     print(str(ind+1)+":"+str(dist))
         #if ind == 10 :
         #print("--> "+str(ind+1)+":"+str(dist))
         weights.append(weight)
@@ -86,8 +95,7 @@ def computeDistances(testFaceMS,r):
     
     return distances
 
-def findSeuil(testFaceMS,r):
-    seuil = 900
+def findSeuil(testFaceMS,r,seuil,U,numpy_array):
     w = testFaceMS @ U[:,:r]
     weights = []
     distances =[]
@@ -95,8 +103,8 @@ def findSeuil(testFaceMS,r):
         weight = image @ U[:,:r]
         dist = np.linalg.norm(weight-w)
         distances.append((dist,ind))
-        #if dist<seuil :
-            #print(str(ind+1)+":"+str(dist))
+        # if dist<seuil :
+        #     print(str(ind+1)+":"+str(dist))
         #if ind == 10 :
         #print("--> "+str(ind+1)+":"+str(dist))
         weights.append(weight)
@@ -168,55 +176,233 @@ def computeImage(id, r, k,seuil):
     
     return VP,FP
 
+def computeSensSpec():
+    r = 6
+    P =5
+    sens = open("sens.dat", "w")
+    spec = open("spec.dat", "w")
+
+    test2 = open("test.dat", "w")
+    ind = 0
+
+    for seuil in range(500,5500,250):
+        scoreVP = []
+        scoreFP = []
+        print("seuil="+str(seuil))
+        for k in range(20):
+            sumFP = 0
+            sumVP = 0
+            #print("test de "+str(k)+"\n")
+            for i in range( (5*k)+1,(5*k)+6):
+                VP,FP =computeImage(i,r,k,seuil)
+                sumVP +=VP
+                sumFP +=FP
+            #print( (sumVP,sumFP))
+            #scoreFP.append((noms[k],sumFP))
+            scoreVP.append(sumVP)
+            scoreFP.append(sumFP)
+
+        VP =sum(i for i in scoreVP )
+        FP =sum(i for i in scoreFP )
+
+        FPR = FP/(10000-500)
+        sensi =VP/(100*P)
+        speci = 1-FPR
+        print("sensivity : " + str(sensi))
+        print("specificity: "+str(speci))
+        sens.write(str(seuil)+" "+str(sensi)+"\n")
+        spec.write(str(seuil)+" "+str(speci)+"\n")
+        
+        test2.write(str(seuil)+" "+str(speci+sensi)+"\n")
+def crop(filename):
+    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    frame = cv2.imread(filename) 
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    hmax =-1
+    indice = -1
+    ind = 0
+    offset =0
+    for face in faces:
+        if (face[2]+face[3]) > hmax :
+            hmax = face[2]+face[3]
+            indice = ind
+        ind+=1
+
+    x= faces[indice][0]
+    y =faces[indice][1]
+    w=faces [indice][2]
+    h=faces [indice][3]
+    frame = frame[y:y+h, x:x+w]
+    frame = cv2.resize(frame, (64,64), interpolation = cv2.INTER_AREA)
+    cv2.imwrite("cropped.jpg", frame)
+    return frame
 
 
-imgs = loadImages()
-numpy_array,average = preProcess(imgs)
-transpose = numpy_array.T
-U, S, VT = np.linalg.svd(transpose,full_matrices=0)
-
-# filepath = 'ressource/dataset/indianFlorentin.jpg'
-# testFaceMS = load(filepath)
-
-r = 6
-
-P =5
-sens = open("sens.dat", "w")
-spec = open("spec.dat", "w")
-
-test2 = open("test.dat", "w")
-ind = 0
-
-for seuil in range(500,5500,250):
-    scoreVP = []
-    scoreFP = []
-    print("seuil="+str(seuil))
-    for k in range(20):
-        sumFP = 0
-        sumVP = 0
-        #print("test de "+str(k)+"\n")
-        for i in range( (5*k)+1,(5*k)+6):
-            VP,FP =computeImage(i,r,k,seuil)
-            sumVP +=VP
-            sumFP +=FP
-        #print( (sumVP,sumFP))
-        #scoreFP.append((noms[k],sumFP))
-        scoreVP.append(sumVP)
-        scoreFP.append(sumFP)
-
-    VP =sum(i for i in scoreVP )
-    FP =sum(i for i in scoreFP )
-
-    FPR = FP/(10000-500)
-    sensi =VP/(100*P)
-    speci = 1-FPR
-    print("sensivity : " + str(sensi))
-    print("specificity: "+str(speci))
-    sens.write(str(seuil)+" "+str(sensi)+"\n")
-    spec.write(str(seuil)+" "+str(speci)+"\n")
+def testImageR(self,average,U,testFaceMS,numpy_array,r):
+    #print(r)
+    display(average)
+    reconFace =  average  + U[:,:r]  @ U[:,:r].T @ testFaceMS
+    recons = np.reshape(reconFace,(64,64))
     
-    test2.write(str(seuil)+" "+str(speci+sensi)+"\n")
+    #---------------------------------------------------------------------------------------------
+    # Ouvre l'image reconstruite
 
+    # create the image object, and save it so that it
+    # won't get deleted by the garbage collector
+    canvas_rec.image_tk = ImageTk.PhotoImage(
+            Image.fromarray(recons).resize((300, 300), Image.ANTIALIAS))
+    # configure the canvas item to use this image
+    canvas_rec.itemconfigure(image_id_rec, image=canvas_rec.image_tk)
+    #---------------------------------------------------------------------------------------------
+    #testFaceMS = test(1)
+    #display(testFaceMS)
+    seuil = 2700
+    #print("distance individuelle : ")
+    distances = computeDistances(testFaceMS,r,seuil,U,numpy_array)
+    distances.sort()
+    #printByName2(distances[:5])
+    print("distance individuelle : ")
+    distances = computeDistances(testFaceMS,r,seuil,U,numpy_array)
+    distances.sort()
+    printByName2(distances[:5])
+
+    print("\ndistance GRoupe : ")
+    distanceGroup = findSeuil(testFaceMS,r,seuil,U,numpy_array)
+    distanceGroup.sort()
+    printByName(distanceGroup[:5])
+
+    dist,ind = distances[0]
+    name =  noms[ind//5 ]
+    dist = str(dist)
+    label_title.configure(text="Ressemblance : "+ name +" distance : "+ dist)
+def printdegueu(self, a):
+    print("dégueu")
+
+def open_file():
+    print("Open file")
+    filename = fd.askopenfilename(title="Choisis ton image")
+    print(filename)
+    
+
+    if(filename):
+        # Ouvre l'image
+        image = Image.open(filename)
+        w, h = image.size
+        imageCropped = crop(filename)
+        gray = cv2.cvtColor(imageCropped, cv2.COLOR_BGR2GRAY)
+        # create the image object, and save it so that it
+        # won't get deleted by the garbage collector
+        canvas.image_tk = ImageTk.PhotoImage(
+            Image.fromarray(gray).resize((300, 300), Image.ANTIALIAS))
+        # configure the canvas item to use this image
+        canvas.itemconfigure(image_id, image=canvas.image_tk)
+        #---------------------------------------------------------------------------------------------
+        # r = 4
+
+
+        imgs = loadImages()
+        numpy_array,average = preProcess(imgs)
+        transpose = numpy_array.T
+        U, S, VT = np.linalg.svd(transpose,full_matrices=0)
+
+        #filepath = 'ressource/dataset/gauthier.jpg'
+        filename = filename.replace("/home/e20150011037/Documents/ReconnaissanceFaciale/", "")
+       
+        
+        testFaceMS = load(filename,average)
+        r = 1
+        # Créer Slider
+        # slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=partial(printdegueu,2))
+        slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=partial(testImageR, average,U,testFaceMS,numpy_array,r))
+        # slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=lambda : testImageR(average,U,testFaceMS,numpy_array,r))
+
+        slider.pack(pady=10)
+        r=slider.get()
+        print(r)
+        # testImageR(average,U,testFaceMS,numpy_array,r)
+        
+# imgs = loadImages()
+# numpy_array,average = preProcess(imgs)
+# transpose = numpy_array.T
+# U, S, VT = np.linalg.svd(transpose,full_matrices=0)
+
+# filepath = 'ressource/dataset/gauthier.jpg'
+# testFaceMS = load(filepath)
+# testFaceMS = test(1)
+# display(testFaceMS)
+# r = 4
+# seuil = 2700
+
+# print("distance individuelle : ")
+# distances = computeDistances(testFaceMS,r,seuil)
+# distances.sort()
+# printByName2(distances[:5])
+
+# print("\ndistance GRoupe : ")
+# distanceGroup = findSeuil(testFaceMS,r,seuil)
+# distanceGroup.sort()
+# printByName(distanceGroup[:5])
+
+
+# Créer première fenêtre
+window = Tk()
+
+window.title("Reconnaissance Faciale")
+window.geometry("720x480")
+window.minsize(352, 240)
+# window.iconbitmap("facial-recognition.ico")
+# window.config(background='#4065A4')
+
+# Creer la frame principale
+frame = Frame(window)
+
+# Création d'image
+width = 300
+height = 300
+
+# Image à reconnaître
+canvas = Canvas(frame, width=width, height=height, bd=0, highlightthickness=0)
+# canvas.create_image(width/2, height/2, image=image_base)
+image_id = canvas.create_image(0, 0, anchor="nw")
+canvas.grid(row=0 , column=0 , sticky=W, padx=10)
+
+# Image reconstruite 
+canvas_rec = Canvas(frame, width=width, height=height, bd=0, highlightthickness=0)
+image_id_rec = canvas_rec.create_image(0, 0, anchor="nw")
+canvas_rec.grid(row=0 , column=1 , sticky=W, padx=10)
+
+
+
+
+
+# Afficher la frame
+frame.pack(expand=YES)
+# Affichage Texte Ressemblance
+label_title = Label(window, font=("Arial", 18), fg='Black')
+label_title.pack(pady=25)
+# Création d'une barre de menu
+menu_bar = Menu(window)
+
+# Créer un premier menu
+file_menu = Menu(menu_bar, tearoff=0)
+file_menu.add_command(label="Ouvrir", command=open_file, accelerator="Ctrl+O")
+file_menu.add_command(
+    label="Quitter", command=window.quit, accelerator="Ctrl+Q")
+
+menu_bar.add_cascade(label="Fichier", menu=file_menu)
+
+
+
+# Configurer notre fenêtre pour ajouter cette men bar
+window.config(menu=menu_bar)
+
+# Shortcuts
+window.bind_all("<Control-o>", lambda e: open_file())
+window.bind_all("<Control-q>", lambda e: window.quit())
+
+# Afficher la fenêtre
+window.mainloop()
 #print(#VP)
 #print(FP)
 
