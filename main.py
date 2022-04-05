@@ -239,11 +239,18 @@ def crop(filename):
     return frame
 
 
-def testImageR(self,average,U,testFaceMS,numpy_array,r):
-    #print(r)
+def testImageR(average,U,testFaceMS,numpy_array,r):
+    print(r)
+    #display(average)
+
+    r = int(r)
     display(average)
     reconFace =  average  + U[:,:r]  @ U[:,:r].T @ testFaceMS
+
     recons = np.reshape(reconFace,(64,64))
+
+    display(recons)
+
     
     #---------------------------------------------------------------------------------------------
     # Ouvre l'image reconstruite
@@ -303,6 +310,7 @@ def open_file():
 
         imgs = loadImages()
         numpy_array,average = preProcess(imgs)
+
         transpose = numpy_array.T
         U, S, VT = np.linalg.svd(transpose,full_matrices=0)
 
@@ -311,11 +319,17 @@ def open_file():
        
         
         testFaceMS = load(filename,average)
-        r = 1
+        #display(average)
+        r = 50
+        #testImageR(average,U,testFaceMS,numpy_array,r)
+        #reconFace =  average  + U[:,:r]  @ U[:,:r].T @ testFaceMS
+        #recons = np.reshape(reconFace,(64,64))
+        #display(recons)
         # Créer Slider
+        g = partial(testImageR, average, U, testFaceMS, numpy_array)
         # slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=partial(printdegueu,2))
-        slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=partial(testImageR, average,U,testFaceMS,numpy_array,r))
-        # slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=lambda : testImageR(average,U,testFaceMS,numpy_array,r))
+        slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=g)
+        #slider = Scale(window, from_=1, to=n, orient=HORIZONTAL, command=lambda : testImageR(average,U,testFaceMS,numpy_array,r))
 
         slider.pack(pady=10)
         r=slider.get()
