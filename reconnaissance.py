@@ -13,12 +13,14 @@ from functools import partial
 
 
 class Reconnaissance:
-    def __init__(self, path, noms, n):
+    def __init__(self, path, croppedResolution, noms, n):
         self.pathDatabase = path
         self.fileNameAbsolute = ""
         self.fileNameRelative = ""
         self.imagesCount = n
         self.noms = noms
+        self.croppedResolution = croppedResolution
+
         self.imagesDatabase = []
         self.imagesDatabaseArray = None
         self.averageImageDatabase = None
@@ -62,7 +64,7 @@ class Reconnaissance:
         h = faces[indice][3]
         self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         self.imageCropped = cv2.resize(
-            self.imageCropped, (64, 64), interpolation=cv2.INTER_AREA)
+            self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
         cv2.imwrite("cropped.jpg", self.imageCropped)
 
     def displayImage(self, fileNameAbsolute, image_id, canvas):
@@ -176,7 +178,8 @@ class Reconnaissance:
         self.reconFace = self.averageImageDatabase + \
             self.U[:, :self.r]  @ self.U[:, :self.r].T @ self.testFaceMS
 
-        recons = np.reshape(self.reconFace, (64, 64))
+        recons = np.reshape(
+            self.reconFace, (self.croppedResolution, self.croppedResolution))
 
         # display(recons)
 
@@ -246,10 +249,24 @@ class Reconnaissance:
 
 if __name__ == '__main__':
     path = 'ressource/dataset/croppedfaces64/face'
+    croppedResolution = 64
     n = 90
     noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "thomas ?", "erwan", "ange", "roland", "aurelien",
             "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
-    reconnaissance = Reconnaissance(path, noms, n)
+
+    # path = 'ressource/dataset/croppedfaces256/face'
+    # croppedResolution = 256
+    # n = 90
+    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "thomas ?", "erwan", "ange", "roland", "aurelien",
+    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
+    # path = 'ressource/dataset/croppedfaces64/face'
+    # croppedResolution = 64
+    # n = 160
+    # noms = ["gauthier", "albena", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+    #         "alexandre S", "florentin", "sylvain", "khélian", "camille",  "alexandre L", "thomas S", "maxime"]
+
+    reconnaissance = Reconnaissance(path, croppedResolution, noms, n)
 
     window = Tk()
 
