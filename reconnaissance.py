@@ -13,7 +13,7 @@ from functools import partial
 
 
 class Reconnaissance:
-    def __init__(self, path, croppedResolution, noms, n):
+    def __init__(self, path, croppedResolution, noms,imagePerPerson, personCount ,n):
         self.pathDatabase = path
         self.fileNameAbsolute = ""
         self.fileNameRelative = ""
@@ -35,19 +35,29 @@ class Reconnaissance:
         self.seuil = 2700
 
         self.slider = None
+        self.imagePerPerson = imagePerPerson
+        self.personCount = personCount
 
-        # self.loadImages()
-        # self.preProcess()
-        # self.load()
+        self.acceptedListe = {}
 
-    def crop(self):
+        self.face_cascade = cv2.CascadeClassifier(
+            'haarcascade_frontalface_default.xml')
+        self.loadImages(self.personCount, self.imagePerPerson, removeI=[], removeJ=[])      
+        print("Preprocessing ...")
+        self.preProcess()
+        self.transpose = self.imagesDatabaseArray.T
+        print("Calcul SVD ...")
+        self.U, self.S, self.VT = np.linalg.svd(
+                self.transpose, full_matrices=0)
+        print("Done !")
+
+    def crop(self, filename):
         """On charge l'image du filepath et on la crop et on l'écrit en dur sur le disque """
 
-        face_cascade = cv2.CascadeClassifier(
-            'haarcascade_frontalface_default.xml')
-        self.imageCropped = cv2.imread(self.fileNameAbsolute)
+
+        self.imageCropped = cv2.imread(filename)
         gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         hmax = -1
         indice = -1
         ind = 0
@@ -65,7 +75,7 @@ class Reconnaissance:
         self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         self.imageCropped = cv2.resize(
             self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
-        cv2.imwrite("cropped.jpg", self.imageCropped)
+        #cv2.imwrite("cropped.jpg", self.imageCropped)
 
     def displayImage(self, fileNameAbsolute, image_id, canvas):
         """Affiche l'image dans le canvas"""
@@ -82,16 +92,18 @@ class Reconnaissance:
             # configure the canvas item to use this image
             canvas.itemconfigure(image_id, image=canvas.image_tk)
 
-    def loadImages(self):
+    def loadImages(self, personCount, imagePerPerson, removeI, removeJ):
         """On charge notre dataset des étudiants d'imagine en gardant les (n-1) premiers donc 95 images sur 100 images. (Il y a 5 images par étudiant)"""
         print("Laoding database ..")
 
-        for i in range(1, self.imagesCount+1):
-            stri = self.pathDatabase+format(i, '03d')+'.jpg'
-            img = cv2.imread(stri)
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            gray = np.ndarray.flatten(gray)
-            self.imagesDatabase.append(gray)
+        for i in range(1, personCount+1) :
+                for j in range(1, imagePerPerson+1):
+                        stri = self.pathDatabase+format(i, '02d')+'_'+format(j, '02d')+'.jpg'
+                        #print(stri)
+                        img = cv2.imread(stri)
+                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                        gray = np.ndarray.flatten(gray)
+                        self.imagesDatabase.append(gray)
         print("Database loaded !")
 
     def preProcess(self):
@@ -102,10 +114,10 @@ class Reconnaissance:
             np.tile(self.averageImageDatabase,
                     (self.imagesDatabaseArray.shape[0], 1))
 
-    def load(self):
+    def load(self, imageCropped):
         # img = cv2.imread(filepath)
         # img = self.crop(filepath)
-        gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(imageCropped, cv2.COLOR_BGR2GRAY)
 
         self.testFaceMS = np.ndarray.flatten(gray)-self.averageImageDatabase
 
@@ -129,36 +141,69 @@ class Reconnaissance:
 
         return distances
 
-    def findSeuil(self):
-        w = self.testFaceMS @ self.U[:, :self.r]
-        weights = []
-        distances = []
-        for ind, image in enumerate(self.imagesDatabaseArray):
-            weight = image @ self.U[:, :self.r]
-            dist = np.linalg.norm(weight-w)
-            distances.append((dist, ind))
-            # if dist<seuil :
-            #     print(str(ind+1)+":"+str(dist))
-            # if ind == 10 :
-            #print("--> "+str(ind+1)+":"+str(dist))
-            weights.append(weight)
+    # def findSeuil(self):
+    #     w = self.testFaceMS @ self.U[:, :self.r]
+    #     weights = []
+    #     distances = []
+    #     for ind, image in enumerate(self.imagesDatabaseArray):
+    #         weight = image @ self.U[:, :self.r]
+    #         dist = np.linalg.norm(weight-w)
+    #         distances.append((dist, ind))
+    #         weights.append(weight)
 
-        dist2 = []
-        res = 0
-        i = 1
-        k = 0
+    #     dist2 = []
+    #     res = 0
+    #     i = 1
+    #     k = 0
+    #     for dist, ind in distances:
+    #         if i < self.imagePerPerson+1:
+    #             res += dist
+    #             i += 1
+    #         if i == self.imagePerPerson+1:
+    #             res /= self.imagePerPerson
+    #             dist2.append((res, k))
+    #             k += 1
+    #             res = 0
+    #             i = 1
+
+    #     return dist2
+    
+    def findSeuil2(self, distances):
+
+        # w = self.testFaceMS @ self.U[:, :self.r]
+        # weights = []
+        # distances = []
+        
+        # listOfPersonImage = np.array_split(self.imagesDatabaseArray,19)
+
+        # for ind,person in enumerate(listOfPersonImage):
+        #     distance = []
+        #     for image in person:
+        #         weight = image @ self.U[:, :self.r]
+        #         dist = np.linalg.norm(weight-w)
+        #         distances.append(dist)
+        #         #weightGroup.append(weight)
+
+        #     distances.append((distance,ind))
+
+        # #sum(1 if meets_condition(x) else 0 for x in my_list)
+
+        #print(distances).
+        threshold = 2700
+        liste = {}
         for dist, ind in distances:
-            if i < 6:
-                res += dist
-                i += 1
-            if i == 6:
-                res /= 5
-                dist2.append((res, k))
-                k += 1
-                res = 0
-                i = 1
+            #print(dist)
+            if dist < threshold :
+                #print(ind)
+                if ind//self.imagePerPerson in self.acceptedListe :
+                    self.acceptedListe[ind//self.imagePerPerson] +=1
+                else :
+                    self.acceptedListe[ind//self.imagePerPerson]=1
 
-        return dist2
+        self.acceptedListe = {k: v for k, v in sorted(self.acceptedListe.items(), key=lambda item: item[1], reverse = True)}
+        #print(self.acceptedListe)
+
+        #return self.acceptedListe
 
     def printByName(self, liste):
         for dist, ind in liste:
@@ -167,12 +212,195 @@ class Reconnaissance:
 
     def printByName2(self, liste):
         for dist, ind in liste:
-            # print(ind)
-            print(self.noms[ind//5]+"->"+str(dist))
+            
+            print(self.noms[ind//self.imagePerPerson]+"->"+str(dist))
+
+    def test1(self):
+        ''' Si on a enlevé la n-1 personne on va la tester contre la base de donnée pour voir si elle est reconnu -> faux positif '''
+        self.acceptedList = {}
+        for i in range(1,self.imagePerPerson+1):
+            self.fileNameAbsolute =  self.pathDatabase+format(self.personCount + 1 , '02d')+'_'+format(i, '02d')+'.jpg'
+            self.imageCropped = cv2.imread(self.fileNameAbsolute)            
+            if i == 1 :
+                self.displayImage(self.fileNameAbsolute, image_id_og, canvas_og)
+            self.load(self.imageCropped)
+            self.testImageR(1)
+
+        print("Nombre de personnes : " + str(self.personCount)+ " nb images par personnes : " + str(self.imagePerPerson))
+        for ind,dist in self.acceptedListe.items():
+            print(str(ind) +': '+self.noms[ind]+"->"+str(dist))
+    
+        somme = sum(self.acceptedListe.values())
+        total = self.personCount*self.imagePerPerson*self.imagePerPerson
+        print(str(somme)+'/'+str(total))
+        print("taux de faux positif : " +str(round(somme/total * 100,2))+"%")
+    
+    def test2(self):
+        ''' Si on a enlevé la n-1 image on va la tester contre la base de donnée pour voir si elle est reconnu -> vrai positif '''
+        self.acceptedListe = {}
+        for i in range(1,self.personCount+1):          
+            self.fileNameAbsolute =  self.pathDatabase+format(i , '02d')+'_'+format(self.imagePerPerson + 1 , '02d')+'.jpg'
+            self.imageCropped = cv2.imread(self.fileNameAbsolute)
+            if i == 1 :    
+                self.displayImage(self.fileNameAbsolute, image_id_og, canvas_og)
+            self.load(self.imageCropped)
+            self.testImageR(1)
+
+        print("Nombre de personnes : " + str(self.personCount)+ " nb images par personnes : " + str(self.imagePerPerson))
+        for ind,dist in self.acceptedListe.items():
+            print(str(ind) +': '+self.noms[ind]+"->"+str(dist))
+    
+        somme = sum(self.acceptedListe.values())
+        total = self.personCount*self.imagePerPerson*self.imagePerPerson
+        print(str(somme)+'/'+str(total))
+        print("taux de vrai positif : " +str(round(somme/total * 100,2))+"%")
+
+
+    def testVPFP(self, idPerson, idImage, seuil):
+
+        self.fileNameAbsolute =  self.pathDatabase+format(idPerson  , '02d')+'_'+format(idImage, '02d')+'.jpg'
+        self.imageCropped = cv2.imread(self.fileNameAbsolute)       
+        self.load(self.imageCropped)
+        self.reconFace =  self.averageImageDatabase  + self.U[:,:self.r]  @ self.U[:,:self.r].T @ self.testFaceMS
+        distances = self.computeDistances()
+        #distance = distances.sort()
+        distance = [(a,b) for a,b in distances]
+
+        VP = 0
+        FP = 0
+        VN = 0
+        FN = 0
+        for dist,ind in distance:
+            if dist < seuil:
+                if idImage == ind//self.imagePerPerson:
+                    VP+=1
+                else :
+                    FP+=1
+            else :
+                if idImage == ind//self.imagePerPerson:
+                    FN+=1
+                else :
+                    VN+=1
+    
+        return VP,FP,FN,VN
+    def test3(self):
+        #print(self.testVPFP(1,1,3500))
+        sens = open("sens.dat", "w")
+        spec = open("spec.dat", "w")
+
+        final = open("average.dat", "w")
+
+        #seuil = 5000
+        totalImages = self.imagePerPerson *self.personCount
+        comparedNumberImages = totalImages*self.imagePerPerson
+
+        P = self.imagePerPerson
+        N = (comparedNumberImages - self.imagePerPerson)
+
+        print("P="+str(P))
+        print("N="+str(N))
+        for seuil in range(500,8000,1000):
+            print("seuil="+str(seuil))
+            scoreVP = []
+            scoreFP = []
+            scoreFN = []
+            scoreVN = []
+            for k in range(1,self.personCount+1):
+                sumFP = 0
+                sumVP = 0
+                sumFN = 0
+                sumVN = 0
+                print("test de "+str(k))
+                for i in range(1,self.imagePerPerson+1):
+                    VP,FP,FN,VN =self.testVPFP(i,k,seuil)
+                    sumVP +=VP
+                    sumFP +=FP
+
+                    sumFN +=FN
+                    sumVN +=VN
+                #print( (sumVP,sumFP))
+                #scoreFP.append((noms[k],sumFP))
+                scoreVP.append(sumVP)
+                scoreFP.append(sumFP)
+
+                scoreVN.append(sumVN)
+                scoreFN.append(sumFN)
+
+            VP =sum(i for i in scoreVP )
+            FP =sum(i for i in scoreFP )
+
+            VN =sum(i for i in scoreVN )
+            FN =sum(i for i in scoreFN )
+            print(VP)
+            print(FP)
+            print(FN)
+            print(VN)
+
+
+            FPR = FP/(totalImages*totalImages-self.imagePerPerson*totalImages)
+            sensi =VP/(totalImages*self.imagePerPerson)
+            speci = 1-FPR
+            TN = speci * N
+
+            ACC = (VP +VN ) / ((P +N)*self.personCount)
+            print("accuracy : " + str(ACC))
+
+            print("sensivity : " + str(sensi))
+            print("specificity: "+str(speci))
+            sens.write(str(seuil)+" "+str(sensi)+"\n")
+            spec.write(str(seuil)+" "+str(speci)+"\n")
+            
+            final.write(str(seuil)+" "+str(ACC)+"\n")
+        
+    # def computeSensSpec():
+    #     self.r = 6
+    #     P =5
+    #     sens = open("sens.dat", "w")
+    #     spec = open("spec.dat", "w")
+
+    #     test2 = open("test.dat", "w")
+    #     ind = 0
+
+
+
+    #     for seuil in range(500,5000,500):
+    #         scoreVP = []
+    #         scoreFP = []
+    #         print("seuil="+str(seuil))
+    #         for k in range(self.personCount):
+    #             sumFP = 0
+    #             sumVP = 0
+    #             #print("test de "+str(k)+"\n")
+    #             for i in range( (self.imagePerPerson*k)+1,(self.imagePerPerson*k)+self.imagePerPerson+1):
+    #                 VP,FP =testVPFP(i,r,k,seuil)
+    #                 sumVP +=VP
+    #                 sumFP +=FP
+    #             #print( (sumVP,sumFP))
+    #             #scoreFP.append((noms[k],sumFP))
+    #             scoreVP.append(sumVP)
+    #             scoreFP.append(sumFP)
+
+    #         VP =sum(i for i in scoreVP )
+    #         FP =sum(i for i in scoreFP )
+
+    #         FPR = FP/N
+    #         sensi =VP/P
+    #         speci = 1-FPR
+    #         print("sensivity : " + str(sensi))
+    #         print("specificity: "+str(speci))
+    #         sens.write(str(seuil)+" "+str(sensi)+"\n")
+    #         spec.write(str(seuil)+" "+str(speci)+"\n")
+            
+    #         test2.write(str(seuil)+" "+str(speci+sensi)+"\n")
 
     def testImageR(self, autre):
-        self.r = self.slider.get()
-        print(self.r)
+        
+        if self.slider !=  None:
+            self.r = self.slider.get()
+        else:
+            self.r = 8
+
+        #print(self.r)
 
         # display(self.average)
         self.reconFace = self.averageImageDatabase + \
@@ -198,18 +426,29 @@ class Reconnaissance:
 
         distances = self.computeDistances()
         distances.sort()
-        print("distance individuelle : ")
-        distances = self.computeDistances()
-        distances.sort()
-        self.printByName2(distances[:5])
+        if autre == 0 :
+            print("distance individuelle : ")
+            self.printByName2(distances[:5])
+        
 
-        print("\ndistance GRoupe : ")
-        distanceGroup = self.findSeuil()
-        distanceGroup.sort()
-        self.printByName(distanceGroup[:5])
+        #print("\n Nombre d'image par personne reconnue sous le seuil : ")
+        self.findSeuil2(distances)
+
+
+        #distanceGroup.sort()
+        #self.printByName(distanceGroup[:5])
+
+        # print("\ndistance GRoupe : ")
+        # distanceGroup = self.findSeuil()
+        # distanceGroup.sort()
+        # self.printByName(distanceGroup[:5])
+        
 
         dist, ind = distances[0]
-        name = self.noms[ind//5]
+        #name = self.noms[ind//5]
+       
+        name = self.noms[ind//self.imagePerPerson]
+       
         label_ressemblance.configure(
             text="Ressemblance : " + name + " distance : " + str(dist))
 
@@ -227,32 +466,32 @@ class Reconnaissance:
 
         ############################################################################
         if(self.fileNameAbsolute):
-            self.crop()
+            self.crop(self.fileNameAbsolute)
             # self.display()
             self.displayImage(self.fileNameAbsolute, image_id_og, canvas_og)
             # self.displayImage(self.fileNameAbsolute, image_id_rec, canvas_rec)
-            self.loadImages()
-            self.preProcess()
-            self.transpose = self.imagesDatabaseArray.T
-            self.U, self.S, self.VT = np.linalg.svd(
-                self.transpose, full_matrices=0)
-            self.load()
+
+            self.load(self.imageCropped)
 
             # Création slider
-            self.slider = Scale(window, from_=1, to=self.r, orient=HORIZONTAL,
+            self.slider = Scale(window, from_=8, to=self.imagesCount, orient=HORIZONTAL,
                                 command=self.testImageR)
 
             self.slider.pack(pady=10)
+            self.testImageR(autre=0)
             # r = slider.get()
             # print(r)
+    
 
 
 if __name__ == '__main__':
-    path = 'ressource/dataset/croppedfaces64/face'
+    path = 'ressource/dataset/database25Enhanced/face'
+
     croppedResolution = 64
-    n = 90
-    noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "thomas ?", "erwan", "ange", "roland", "aurelien",
+    n = 950
+    noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
             "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
 
     # path = 'ressource/dataset/croppedfaces256/face'
     # croppedResolution = 256
@@ -265,8 +504,10 @@ if __name__ == '__main__':
     # n = 160
     # noms = ["gauthier", "albena", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
     #         "alexandre S", "florentin", "sylvain", "khélian", "camille",  "alexandre L", "thomas S", "maxime"]
-
-    reconnaissance = Reconnaissance(path, croppedResolution, noms, n)
+    
+    nPerson = 19
+    nImage = 25
+    reconnaissance = Reconnaissance(path, croppedResolution, noms, nImage,nPerson, nPerson*nImage)
 
     window = Tk()
 
@@ -310,6 +551,12 @@ if __name__ == '__main__':
     file_menu = Menu(menu_bar, tearoff=0)
     file_menu.add_command(
         label="Ouvrir", command=reconnaissance.open_file, accelerator="Ctrl+O")
+    file_menu.add_command(
+        label="Test1", command=reconnaissance.test1, accelerator="Ctrl+A")
+    file_menu.add_command(
+        label="Test2", command=reconnaissance.test2, accelerator="Ctrl+Z")
+    file_menu.add_command(
+        label="Test3", command=reconnaissance.test3, accelerator="Ctrl+Z")
     file_menu.add_command(
         label="Quitter", command=window.quit, accelerator="Ctrl+Q")
 
