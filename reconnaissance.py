@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial.distance import cdist
 import os
 import scipy.io
 import cv2
@@ -10,6 +11,13 @@ from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 
 from functools import partial
+
+# Image Alignment
+from imutils.face_utils import FaceAligner
+from imutils.face_utils import rect_to_bb
+import imutils
+import dlib
+# shape_predictor_68_face_landmarks.dat
 
 
 class Reconnaissance:
@@ -45,6 +53,10 @@ class Reconnaissance:
 
         self.face_cascade = cv2.CascadeClassifier(
             'haarcascade_frontalface_default.xml')
+        self.detector = dlib.get_frontal_face_detector()
+        predictor = dlib.shape_predictor(
+            "shape_predictor_68_face_landmarks.dat")
+        self.fa = FaceAligner(predictor, desiredFaceWidth=croppedResolution)
         self.loadImages(self.personCount, self.imagePerPerson,
                         removeI=[], removeJ=[])
         print("Preprocessing ...")
@@ -92,11 +104,9 @@ class Reconnaissance:
     def crop_webcam(self):
         """On charge l'image du filepath et on la crop et on l'écrit en dur sur le disque """
 
-        face_cascade = cv2.CascadeClassifier(
-            'haarcascade_frontalface_default.xml')
         self.imageCropped = self.imageWebcam
         gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         hmax = -1
         indice = -1
         ind = 0
@@ -114,12 +124,39 @@ class Reconnaissance:
         else:
             x = 0
             y = 0
-            w = 64
-            h = 64
+            w = self.croppedResolution
+            h = self.croppedResolution
         self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         self.imageCropped = cv2.resize(
             self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
         # cv2.imwrite("cropped.jpg", self.imageCropped)
+
+    def crop_webcam_aligned(self):
+        """On charge l'image du filepath et on la crop et on l'écrit en dur sur le disque """
+        self.imageCropped = self.imageWebcam
+        gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
+
+        rects = self.detector(gray, 2)
+        if len(rects) > 0:
+            rect = rects[0]
+            (x, y, w, h) = rect_to_bb(rect)
+            # print()
+            self.imageCropped = self.fa.align(self.imageCropped, gray, rect)
+            return True
+        else:
+            # self.crop_webcam_aligned()
+            return False
+            self.imageCropped = self.imageCropped[0:self.croppedResolution,
+                                                  0:self.croppedResolution]
+            self.imageCropped = cv2.resize(
+                self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
+
+        # self.imageCropped = self.imageCropped[y:y+h, x:x+w]
+        # self.imageCropped = cv2.resize(
+        #     self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
+        # cv2.imwrite("cropped.jpg", self.imageCropped)
+
+    #######################################################################################################################################################################
 
     def displayImage(self, fileNameAbsolute, image_id, canvas):
         """Affiche l'image dans le canvas"""
@@ -518,7 +555,42 @@ class Reconnaissance:
             if i == une_frame_sur:
                 # self.imageWebcam = img
                 self.imageWebcam = cv2image
-                self.crop_webcam()
+                # self.crop_webcam()
+                success = self.crop_webcam_aligned()
+                if success:
+                    self.displayImage(self.fileNameAbsolute,
+                                      image_id_og, canvas_og)
+
+                    self.load(self.imageCropped)
+                    self.compute_and_display_ressemblance(other=0)
+
+                i = 0
+            # Repeat after an interval to capture continiously
+        label_webcam.after(20, lambda: self.show_frames(i, une_frame_sur))
+
+    def show_frames_aligned(self, i, une_frame_sur):
+        """Define function to show frame"""
+
+        # Capture frame-by-frame
+        if self.pauseVideoFlag == False:
+            i += 1
+            # Get the latest frame and convert into Image
+            cv2image = cv2.cvtColor(cap.read()[1], cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(cv2image)
+            basewidth = 400
+            wpercent = (basewidth/float(img.size[0]))
+            hsize = int((float(img.size[1])*float(wpercent)))
+            img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+            # Convert image to PhotoImage
+            imgtk = ImageTk.PhotoImage(image=img)
+            label_webcam.imgtk = imgtk
+            label_webcam.configure(image=imgtk)
+
+            if i == une_frame_sur:
+                # self.imageWebcam = img
+                self.imageWebcam = cv2image
+                # self.crop_webcam()
+                self.crop_webcam_aligned()
                 self.displayImage(self.fileNameAbsolute,
                                   image_id_og, canvas_og)
 
@@ -600,7 +672,8 @@ class Reconnaissance:
             self.slider.pack(pady=10)
             self.onlyOneSlider = True
 
-        self.show_frames(0, 20)
+        # self.show_frames(0, 20)
+        self.show_frames_aligned(0, 20)
 
     def open_phonecam(self):
         if self.onlyOneSlider == False:
@@ -688,7 +761,7 @@ if __name__ == '__main__':
     # Créer un premier menu
     file_menu = Menu(menu_bar, tearoff=0)
     file_menu.add_command(
-        label="Ouvrir", command=reconnaissance.open_file, accelerator="Ctrl+O")
+        label="Ouvrir une Image", command=reconnaissance.open_file, accelerator="Ctrl+O")
     file_menu.add_command(
         label="Ouvrir flux vidéo de la webcam", command=reconnaissance.open_webcam, accelerator="Ctrl+W")
     file_menu.add_command(
