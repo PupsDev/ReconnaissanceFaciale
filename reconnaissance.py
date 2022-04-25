@@ -367,74 +367,114 @@ class Reconnaissance:
                     VN += 1
 
         return VP, FP, FN, VN
+    
+    def testVPFP2(self, idPerson, idImage, seuil):
 
-    def test3(self):
-        # print(self.testVPFP(1,1,3500))
-        sens = open("sens.dat", "w")
-        spec = open("spec.dat", "w")
+        self.fileNameAbsolute = self.pathDatabase + \
+            format(idPerson, '02d')+'_'+format(idImage, '02d')+'.jpg'
+        self.imageCropped = cv2.imread(self.fileNameAbsolute)
+        self.load(self.imageCropped)
+        self.reconFace = self.averageImageDatabase + \
+            self.U[:, :self.r]  @ self.U[:, :self.r].T @ self.testFaceMS
+        distances = self.computeDistances()
+        #distance = distances.sort()
+        distance = [(a, b) for a, b in distances]
 
-        final = open("average.dat", "w")
+        VP = 0
+        FP = 0
+        VN = 0
+        FN = 0
+        for dist, ind in distance:
+            if idImage == ind//self.imagePerPerson:
+                if dist < seuil:
+                    VP += 1
+                else:
+                    FP += 1
+            else:
+                if idImage == ind//self.imagePerPerson:
+                    FN += 1
+                else:
+                    VN += 1
 
-        #seuil = 5000
-        totalImages = self.imagePerPerson * self.personCount
-        comparedNumberImages = totalImages*self.imagePerPerson
+        return VP, FP, FN, VN
 
-        P = self.imagePerPerson
-        N = (comparedNumberImages - self.imagePerPerson)
+        def test3(self):
+            #print(self.testVPFP(1,1,3500))
+            sens = open("sens.dat", "w")
+            spec = open("spec.dat", "w")
 
-        print("P="+str(P))
-        print("N="+str(N))
-        for seuil in range(500, 8000, 1000):
-            print("seuil="+str(seuil))
-            scoreVP = []
-            scoreFP = []
-            scoreFN = []
-            scoreVN = []
-            for k in range(1, self.personCount+1):
-                sumFP = 0
-                sumVP = 0
-                sumFN = 0
-                sumVN = 0
-                print("test de "+str(k))
-                for i in range(1, self.imagePerPerson+1):
-                    VP, FP, FN, VN = self.testVPFP(i, k, seuil)
-                    sumVP += VP
-                    sumFP += FP
+            final = open("average.dat", "w")
 
-                    sumFN += FN
-                    sumVN += VN
-                #print( (sumVP,sumFP))
-                # scoreFP.append((noms[k],sumFP))
-                scoreVP.append(sumVP)
-                scoreFP.append(sumFP)
+            #seuil = 5000
+            totalImages = self.imagePerPerson *self.personCount
+            comparedNumberImages = totalImages*self.imagePerPerson
 
-                scoreVN.append(sumVN)
-                scoreFN.append(sumFN)
+            P = self.imagePerPerson
+            N = (comparedNumberImages - self.imagePerPerson)
 
-            VP = sum(i for i in scoreVP)
-            FP = sum(i for i in scoreFP)
+            print("P="+str(P))
+            print("N="+str(N))
+            for seuil in range(500,8000,1000):
+                print("seuil="+str(seuil))
+                scoreVP = []
+                scoreFP = []
+                scoreFN = []
+                scoreVN = []
+                for k in range(1,self.personCount+1):
+                    sumFP = 0
+                    sumVP = 0
+                    sumFN = 0
+                    sumVN = 0
+                    print("test de "+str(k))
+                    for i in range(1,self.imagePerPerson+1):
+                        VP,FP,FN,VN =self.testVPFP(k,i,seuil)
+                        sumVP +=VP
+                        sumFP +=FP
 
-            VN = sum(i for i in scoreVN)
-            FN = sum(i for i in scoreFN)
-            print(VP)
-            print(FP)
-            print(FN)
-            print(VN)
+                        sumFN +=FN
+                        sumVN +=VN
+                    #print( (sumVP,sumFP))
+                    #scoreFP.append((noms[k],sumFP))
+                    scoreVP.append(sumVP)
+                    scoreFP.append(sumFP)
 
-            FPR = FP/(totalImages*totalImages-self.imagePerPerson*totalImages)
-            sensi = VP/(totalImages*self.imagePerPerson)
-            speci = 1-FPR
-            TN = speci * N
+                    scoreVN.append(sumVN)
+                    scoreFN.append(sumFN)
 
-            ACC = (VP + VN) / ((P + N)*self.personCount)
-            print("accuracy : " + str(ACC))
+                VP =sum(i for i in scoreVP )
+                FP =sum(i for i in scoreFP )
 
-            print("sensivity : " + str(sensi))
-            print("specificity: "+str(speci))
-            sens.write(str(seuil)+" "+str(sensi)+"\n")
-            spec.write(str(seuil)+" "+str(speci)+"\n")
+                VN =sum(i for i in scoreVN )
+                FN =sum(i for i in scoreFN )
+                print(VP)
+                print(FP)
+                print(FN)
+                print(VN)
 
-            final.write(str(seuil)+" "+str(ACC)+"\n")
+
+                FPR = FP/(totalImages*totalImages-self.imagePerPerson*totalImages)
+                sensi =VP/(totalImages*self.imagePerPerson)
+                speci = 1-FPR
+                TN = speci * N
+
+                ACC = (VP +VN ) / ((P +N)*self.personCount)
+                print("accuracy : " + str(ACC))
+
+                print("sensivity : " + str(sensi))
+                print("specificity: "+str(speci))
+                sens.write(str(seuil)+" "+str(sensi)+"\n")
+                spec.write(str(seuil)+" "+str(speci)+"\n")
+                
+                final.write(str(seuil)+" "+str(ACC)+"\n")
+        
+    def test4(self):
+        seuil = 1250
+        for i in range(1,self.imagePerPerson+1):
+            print(self.testVPFP2(self.personCount + 1 , i, seuil))
+    def test5(self):
+        seuil = 1500
+        for i in range(1,self.personCount+1):
+            print(self.testVPFP2( i , self.imagePerPerson+1, seuil))
 
     # def computeSensSpec():
     #     self.r = 6
@@ -777,6 +817,12 @@ if __name__ == '__main__':
     test_menu.add_command(
         label="Test3", command=reconnaissance.test3, accelerator="Ctrl+3")
 
+    file_menu.add_command(
+        label="Test4", command=reconnaissance.test4, accelerator="Ctrl+Z")
+    file_menu.add_command(
+        label="Test5", command=reconnaissance.test5, accelerator="Ctrl+Z")
+    file_menu.add_command(
+        label="Quitter", command=window.quit, accelerator="Ctrl+Q")
     menu_bar.add_cascade(label="Fichier", menu=file_menu)
     menu_bar.add_cascade(label="Tests", menu=test_menu)
 
