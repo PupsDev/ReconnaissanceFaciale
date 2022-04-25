@@ -1,6 +1,6 @@
 #!/bin/bash
 # NOTE : Quote it else use array to avoid problems #
-FILES="ressource/dataset/database25/*"
+FILES="ressource/dataset/untreated/dataset/*"
 for f in $FILES
 do
   echo "Processing $f file..."

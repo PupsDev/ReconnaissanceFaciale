@@ -43,7 +43,7 @@ class Reconnaissance:
         self.S = None
         self.VT = None
         self.r = 50
-        self.seuil = 2700
+        self.seuil = 6000
 
         self.frameSpinbox = None
         self.slider = None
@@ -109,6 +109,9 @@ class Reconnaissance:
         self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         self.imageCropped = cv2.resize(
             self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
+        # self.imageCropped = cv2.equalizeHist(self.imageCropped)
+
+        # self.imageCropped = cv2.GaussianBlur(self.imageCropped, (3, 3), 0)
         # cv2.imwrite("cropped.jpg", self.imageCropped)
 
     def crop_webcam(self):
@@ -171,6 +174,8 @@ class Reconnaissance:
     def displayImage(self, fileNameAbsolute, image_id, canvas):
         """Affiche l'image dans le canvas"""
         gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
         # create the image object, and save it so that it
         # won't get deleted by the garbage collector
         canvas.image_tk = ImageTk.PhotoImage(
@@ -203,6 +208,8 @@ class Reconnaissance:
 
     def load(self, imageCropped):
         gray = cv2.cvtColor(imageCropped, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
         self.testFaceMS = np.ndarray.flatten(gray)-self.averageImageDatabase
 
@@ -537,6 +544,7 @@ class Reconnaissance:
 
         # print("\n Nombre d'image par personne reconnue sous le seuil : ")
         self.findSeuil2(distances)
+        # print(self.acceptedListe)
 
         # distanceGroup.sort()
         # self.printByName(distanceGroup[:5])
@@ -707,7 +715,7 @@ class Reconnaissance:
         self.spinBoxDimension = ttk.Spinbox(
             self.frameSpinbox,
             from_=0,
-            to=50,
+            to=self.imagesCount,
             textvariable=self.currentValueDimension,
             command=lambda: self.testImageR(0),
             width=5)
@@ -723,7 +731,7 @@ class Reconnaissance:
         self.spinBoxSeuil = ttk.Spinbox(
             self.frameSpinbox,
             from_=0,
-            to=5000,
+            to=10000,
             textvariable=self.currentValueSeuil,
             command=lambda: self.compute_and_display_ressemblance(0),
             width=5)
@@ -772,27 +780,42 @@ class Reconnaissance:
 
 
 if __name__ == '__main__':
-    path = 'ressource/dataset/database25Enhanced/face'
-
-    croppedResolution = 64
-    n = 950
-    noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
-            "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
-
     # path = 'ressource/dataset/croppedfaces256/face'
     # croppedResolution = 256
-    # n = 90
     # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "thomas ?", "erwan", "ange", "roland", "aurelien",
     #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
 
     # path = 'ressource/dataset/croppedfaces64/face'
     # croppedResolution = 64
-    # n = 160
     # noms = ["gauthier", "albena", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
     #         "alexandre S", "florentin", "sylvain", "khélian", "camille",  "alexandre L", "thomas S", "maxime"]
 
-    nPerson = 19
+    # path = 'ressource/dataset/database25Enhanced/face'
+    # croppedResolution = 64
+    # nImage = 25
+    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
+    # path = 'ressource/dataset/new/aligned/face'
+    # croppedResolution = 64
+    # nImage = 25
+    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
+    path = 'ressource/dataset/new/aligned_equalized_blurred/face'
+    croppedResolution = 64
     nImage = 25
+    noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+            "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
+    # path = 'ressource/dataset/new/aligned_equalized_blurred_spec/face'
+    # croppedResolution = 64
+    # nImage = 89
+    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+
+    nPerson = 19
+
     reconnaissance = Reconnaissance(
         path, croppedResolution, noms, nImage, nPerson, nPerson*nImage)
 
