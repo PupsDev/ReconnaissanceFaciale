@@ -23,13 +23,14 @@ import dlib
 
 
 class Reconnaissance:
-    def __init__(self, path, croppedResolution, noms, imagePerPerson, personCount, n):
+    def __init__(self, path, croppedResolution, noms, imagePerPerson, personCount, n, equalizeAndBlur):
         self.pathDatabase = path
         self.fileNameAbsolute = ""
         self.fileNameRelative = ""
         self.imagesCount = n
         self.noms = noms
         self.croppedResolution = croppedResolution
+        self.EqualizeAndBlur = equalizeAndBlur
 
         self.imagesDatabase = []
         self.imagesDatabaseArray = None
@@ -42,8 +43,11 @@ class Reconnaissance:
         self.U = None
         self.S = None
         self.VT = None
-        self.r = 50
+        self.r = int(0.15*n)
         self.seuil = 6000
+        self.theta = 2000
+        self.itheta = 2000
+        self.removeJ = -1
 
         self.frameSpinbox = None
         self.slider = None
@@ -67,19 +71,49 @@ class Reconnaissance:
         predictor = dlib.shape_predictor(
             "shape_predictor_68_face_landmarks.dat")
         self.fa = FaceAligner(predictor, desiredFaceWidth=croppedResolution)
+        self.starter()
+        # self.getmaxdist()
+
+    def switch_pauseFlag(self):
+        self.pauseVideoFlag = not(self.pauseVideoFlag)
+        # print(self.pauseVideoFlag)
+
+    def starter(self):
         self.loadImages(self.personCount, self.imagePerPerson,
-                        removeI=[], removeJ=[])
+                        removeI=[], removeJ=self.removeJ)
         print("Preprocessing ...")
         self.preProcess()
         self.transpose = self.imagesDatabaseArray.T
         print("Calcul SVD ...")
         self.U, self.S, self.VT = np.linalg.svd(
             self.transpose, full_matrices=0)
-        print("Done !")
 
-    def switch_pauseFlag(self):
-        self.pauseVideoFlag = not(self.pauseVideoFlag)
-        # print(self.pauseVideoFlag)
+        print("Done !")
+        k = sum(self.S)
+        liste = [100*i/k for i in self.S]
+        var = []
+        sumsum = 0
+        for i in liste:
+            sumsum += i
+            var.append(sumsum)
+
+    def getmaxdist(self):
+        """Dernière étape on calcule les poids de chaque image du dataset et on calcule la distance du visage inconnu à celui de tous les visages connus."""
+
+        weights = []
+        distances = []
+        for i, imageI in enumerate(self.imagesDatabaseArray):
+            for j, imageJ in enumerate(self.imagesDatabaseArray):
+                if i != j:
+                    weight = imageI @ self.U[:, :self.r]
+                    weight2 = imageJ @ self.U[:, :self.r]
+
+                    dist = np.linalg.norm(weight-weight2)
+                    weights.append(dist)
+        print("MAX : ")
+        self.theta = 0.34*max(weights)
+        self.itheta = 0.66*max(weights)
+        print(self.theta)
 
     def crop_filepath(self, filename):
         """On charge l'image du filepath et on la crop et on l'écrit en dur sur le disque """
@@ -151,6 +185,7 @@ class Reconnaissance:
 
         rects = self.detector(gray, 2)
         if len(rects) > 0:
+            # print("OK")
             rect = rects[0]
             (x, y, w, h) = rect_to_bb(rect)
             # print()
@@ -159,10 +194,10 @@ class Reconnaissance:
         else:
             # self.crop_webcam_aligned()
             return False
-            self.imageCropped = self.imageCropped[0:self.croppedResolution,
-                                                  0:self.croppedResolution]
-            self.imageCropped = cv2.resize(
-                self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
+            # self.imageCropped = self.imageCropped[0:self.croppedResolution,
+            #                                       0:self.croppedResolution]
+            # self.imageCropped = cv2.resize(
+            #     self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
 
         # self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         # self.imageCropped = cv2.resize(
@@ -174,8 +209,10 @@ class Reconnaissance:
     def displayImage(self, fileNameAbsolute, image_id, canvas):
         """Affiche l'image dans le canvas"""
         gray = cv2.cvtColor(self.imageCropped, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        if self.EqualizeAndBlur:
+            # print("OK")
+            gray = cv2.equalizeHist(gray)
+            gray = cv2.GaussianBlur(gray, (3, 3), 0)
         # create the image object, and save it so that it
         # won't get deleted by the garbage collector
         canvas.image_tk = ImageTk.PhotoImage(
@@ -208,8 +245,10 @@ class Reconnaissance:
 
     def load(self, imageCropped):
         gray = cv2.cvtColor(imageCropped, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+        if self.EqualizeAndBlur:
+            gray = cv2.equalizeHist(gray)
+            gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
         self.testFaceMS = np.ndarray.flatten(gray)-self.averageImageDatabase
 
@@ -626,13 +665,12 @@ class Reconnaissance:
                 # self.imageWebcam = img
                 self.imageWebcam = cv2image
                 # self.crop_webcam()
-                success = self.crop_webcam_aligned()
-                if success:
-                    self.displayImage(self.fileNameAbsolute,
-                                      image_id_og, canvas_og)
+                self.crop_webcam()
+                self.displayImage(self.fileNameAbsolute,
+                                  image_id_og, canvas_og)
 
-                    self.load(self.imageCropped)
-                    self.compute_and_display_ressemblance(other=0)
+                self.load(self.imageCropped)
+                self.compute_and_display_ressemblance(other=0)
 
                 i = 0
             # Repeat after an interval to capture continiously
@@ -659,13 +697,13 @@ class Reconnaissance:
             if i == une_frame_sur:
                 # self.imageWebcam = img
                 self.imageWebcam = cv2image
-                # self.crop_webcam()
-                self.crop_webcam_aligned()
-                self.displayImage(self.fileNameAbsolute,
-                                  image_id_og, canvas_og)
+                success = self.crop_webcam_aligned()
+                if success:
+                    self.displayImage(self.fileNameAbsolute,
+                                      image_id_og, canvas_og)
 
-                self.load(self.imageCropped)
-                self.compute_and_display_ressemblance(other=0)
+                    self.load(self.imageCropped)
+                    self.compute_and_display_ressemblance(other=0)
 
                 i = 0
             # Repeat after an interval to capture continiously
@@ -703,6 +741,40 @@ class Reconnaissance:
             # Repeat after an interval to capture continiously
         label_webcam.after(
             20, lambda: self.show_frames_phone(i, une_frame_sur))
+
+    def show_frames_phone_aligned(self, i, une_frame_sur):
+        """Define function to show frame from phone"""
+
+        # Capture frame-by-frame
+        if self.pauseVideoFlag == False:
+            i += 1
+            # Get the latest frame and convert into Image
+            cv2image = cv2.cvtColor(cap_phone.read()[1], cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(cv2image)
+            basewidth = 400
+            wpercent = (basewidth/float(img.size[0]))
+            hsize = int((float(img.size[1])*float(wpercent)))
+            img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+            # Convert image to PhotoImage
+            imgtk = ImageTk.PhotoImage(image=img)
+            label_webcam.imgtk = imgtk
+            label_webcam.configure(image=imgtk)
+
+            if i == une_frame_sur:
+                # self.imageWebcam = img
+                self.imageWebcam = cv2image
+                success = self.crop_webcam_aligned()
+                if success:
+                    self.displayImage(self.fileNameAbsolute,
+                                      image_id_og, canvas_og)
+
+                    self.load(self.imageCropped)
+                    self.compute_and_display_ressemblance(other=0)
+
+                i = 0
+            # Repeat after an interval to capture continiously
+        label_webcam.after(
+            20, lambda: self.show_frames_phone_aligned(i, une_frame_sur))
     #######################################################################################################################################################################
 
     def show_spinboxes(self):
@@ -727,17 +799,20 @@ class Reconnaissance:
             "Arial", 18), fg='Black', text="Seuil :")
         self.labelSeuil.grid(row=0, column=4, sticky=W, padx=10)
         self.currentValueSeuil = StringVar()
-        self.currentValueSeuil.set("2700")
+        # self.currentValueSeuil.set(str(int(self.theta)))
+        self.currentValueSeuil.set("3800")
+
         self.spinBoxSeuil = ttk.Spinbox(
             self.frameSpinbox,
             from_=0,
-            to=10000,
+            to=100000,
             textvariable=self.currentValueSeuil,
             command=lambda: self.compute_and_display_ressemblance(0),
             width=5)
 
         self.spinBoxSeuil.grid(row=0, column=5, sticky=W, padx=10)
         self.frameSpinbox.pack(expand=YES)
+
         self.onlyOneSlider = True
 
     def open_file(self):
@@ -776,48 +851,59 @@ class Reconnaissance:
         if self.onlyOneSlider == False:
             self.show_spinboxes()
 
-        self.show_frames_phone(0, 20)
+        # self.show_frames_phone(0, 20)
+        self.show_frames_phone_aligned(0, 20)
 
 
 if __name__ == '__main__':
-    # path = 'ressource/dataset/croppedfaces256/face'
-    # croppedResolution = 256
-    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "thomas ?", "erwan", "ange", "roland", "aurelien",
-    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
 
-    # path = 'ressource/dataset/croppedfaces64/face'
+    # path = 'ressource/dataset/database5/face'
     # croppedResolution = 64
-    # noms = ["gauthier", "albena", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
-    #         "alexandre S", "florentin", "sylvain", "khélian", "camille",  "alexandre L", "thomas S", "maxime"]
-
-    # path = 'ressource/dataset/database25Enhanced/face'
-    # croppedResolution = 64
-    # nImage = 25
+    # nImage = 5
+    # equalizedAndBlur = False
     # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
     #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
 
-    # path = 'ressource/dataset/new/aligned/face'
-    # croppedResolution = 64
-    # nImage = 25
-    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
-    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
-
-    path = 'ressource/dataset/new/aligned_equalized_blurred/face'
-    croppedResolution = 64
-    nImage = 25
-    noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
-            "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
-
-    # path = 'ressource/dataset/new/aligned_equalized_blurred_spec/face'
-    # croppedResolution = 64
-    # nImage = 89
-    # noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
-    #         "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+    print("Choix de la base de donnée : ")
+    print("1. Originale")
+    print("2. Visages Alignés")
+    print("3. Visages Alignés puis égalisés puis flouttés")
+    print("4. Visages Alignés puis égalisés puis flouttés puis augmentés avec spécification d'histogramme")
+    choix = input()
+    choix = int(choix)
+    if choix == 1:
+        path = 'ressource/dataset/database25Enhanced/face'
+        croppedResolution = 64
+        nImage = 25
+        equalizedAndBlur = False
+        noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+                "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+    if choix == 2:
+        path = 'ressource/dataset/new/aligned/face'
+        croppedResolution = 64
+        nImage = 25
+        equalizedAndBlur = False
+        noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+                "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+    if choix == 3:
+        path = 'ressource/dataset/new/aligned_equalized_blurred/face'
+        croppedResolution = 64
+        nImage = 25
+        equalizedAndBlur = True
+        noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+                "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
+    if choix == 4:
+        path = 'ressource/dataset/new/aligned_equalized_blurred_spec/face'
+        croppedResolution = 64
+        nImage = 89
+        equalizedAndBlur = True
+        noms = ["gauthier", "albena", "mathieu", "alexandre F", "dorian", "erwan", "ange", "roland", "aurelien",
+                "samuel", "alexandre S", "florentin", "sylvain", "khélian", "camille", "marius", "alexandre L", "thomas S", "maxime"]
 
     nPerson = 19
 
     reconnaissance = Reconnaissance(
-        path, croppedResolution, noms, nImage, nPerson, nPerson*nImage)
+        path, croppedResolution, noms, nImage, nPerson, nPerson*nImage, equalizedAndBlur)
 
     # cameraFeedURL = "https://192.168.1.23:8080/video"
     cameraFeedURL = "https://192.168.1.10:8080/video"

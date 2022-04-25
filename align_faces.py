@@ -30,7 +30,7 @@ image = cv2.imread(args["image"])
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 # show the original input image and detect faces in the grayscale
 # image
-# cv2.imshow("Input", image)
+cv2.imshow("Input", image)
 rects = detector(gray, 2)
 # test_rect = rects[0]
 # print(len(rects))
@@ -38,15 +38,15 @@ rects = detector(gray, 2)
 
 rect = rects[0]
 (x, y, w, h) = rect_to_bb(rect)
-# faceOrig = imutils.resize(image[y:y + h, x:x + w], width=256)
+faceOrig = imutils.resize(image[y:y + h, x:x + w], width=256)
 faceAligned = fa.align(image, gray, rect)
-faceAligned = cv2.resize(faceAligned, (64, 64),
-                         interpolation=cv2.INTER_AREA)
+# faceAligned = cv2.resize(faceAligned, (64, 64),
+#                          interpolation=cv2.INTER_AREA)
 # display the output images
-# cv2.imshow("Original", faceOrig)
-# cv2.imshow("Aligned", faceAligned)
+cv2.imshow("Original", faceOrig)
+cv2.imshow("Aligned", faceAligned)
 #     print("ressource/dataset/database25Aligned/" +
 #           os.path.basename(args["image"]))
-cv2.imwrite("ressource/dataset/untreated/dataset_crop/" +
-            os.path.basename(args["image"]), faceAligned)
+# cv2.imwrite("ressource/dataset/untreated/dataset_crop/" +
+#             os.path.basename(args["image"]), faceAligned)
 cv2.waitKey(0)
