@@ -7,6 +7,8 @@ import cv2
 import sys
 
 from tkinter import *
+# import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 
@@ -43,8 +45,16 @@ class Reconnaissance:
         self.r = 50
         self.seuil = 2700
 
+        self.frameSpinbox = None
         self.slider = None
+        self.currentValueDimension = None
+        self.labelDimension = None
+        self.spinBoxDimension = None
+        self.currentValueSeuil = None
+        self.labelSeuil = None
+        self.spinBoxSeuil = None
         self.onlyOneSlider = False
+
         self.pauseVideoFlag = False
         self.imagePerPerson = imagePerPerson
         self.personCount = personCount
@@ -99,7 +109,7 @@ class Reconnaissance:
         self.imageCropped = self.imageCropped[y:y+h, x:x+w]
         self.imageCropped = cv2.resize(
             self.imageCropped, (self.croppedResolution, self.croppedResolution), interpolation=cv2.INTER_AREA)
-        #cv2.imwrite("cropped.jpg", self.imageCropped)
+        # cv2.imwrite("cropped.jpg", self.imageCropped)
 
     def crop_webcam(self):
         """On charge l'image du filepath et on la crop et on l'écrit en dur sur le disque """
@@ -209,10 +219,10 @@ class Reconnaissance:
             # if dist<seuil :
             #     print(str(ind+1)+":"+str(dist))
             # if ind == 10 :
-            #print("--> "+str(ind+1)+":"+str(dist))
+            # print("--> "+str(ind+1)+":"+str(dist))
             weights.append(weight)
 
-        #dist = np.linalg.norm(weights[10]-weights[90])
+        # dist = np.linalg.norm(weights[10]-weights[90])
 
         return distances
 
@@ -347,7 +357,7 @@ class Reconnaissance:
         self.reconFace = self.averageImageDatabase + \
             self.U[:, :self.r]  @ self.U[:, :self.r].T @ self.testFaceMS
         distances = self.computeDistances()
-        #distance = distances.sort()
+        # distance = distances.sort()
         distance = [(a, b) for a, b in distances]
 
         VP = 0
@@ -367,7 +377,7 @@ class Reconnaissance:
                     VN += 1
 
         return VP, FP, FN, VN
-    
+
     def testVPFP2(self, idPerson, idImage, seuil):
 
         self.fileNameAbsolute = self.pathDatabase + \
@@ -377,7 +387,7 @@ class Reconnaissance:
         self.reconFace = self.averageImageDatabase + \
             self.U[:, :self.r]  @ self.U[:, :self.r].T @ self.testFaceMS
         distances = self.computeDistances()
-        #distance = distances.sort()
+        # distance = distances.sort()
         distance = [(a, b) for a, b in distances]
 
         VP = 0
@@ -398,83 +408,84 @@ class Reconnaissance:
 
         return VP, FP, FN, VN
 
-        def test3(self):
-            #print(self.testVPFP(1,1,3500))
-            sens = open("sens.dat", "w")
-            spec = open("spec.dat", "w")
+    def test3(self):
+        # print(self.testVPFP(1,1,3500))
+        sens = open("sens.dat", "w")
+        spec = open("spec.dat", "w")
 
-            final = open("average.dat", "w")
+        final = open("average.dat", "w")
 
-            #seuil = 5000
-            totalImages = self.imagePerPerson *self.personCount
-            comparedNumberImages = totalImages*self.imagePerPerson
+        # seuil = 5000
+        totalImages = self.imagePerPerson * self.personCount
+        comparedNumberImages = totalImages*self.imagePerPerson
 
-            P = self.imagePerPerson
-            N = (comparedNumberImages - self.imagePerPerson)
+        P = self.imagePerPerson
+        N = (comparedNumberImages - self.imagePerPerson)
 
-            print("P="+str(P))
-            print("N="+str(N))
-            for seuil in range(500,8000,1000):
-                print("seuil="+str(seuil))
-                scoreVP = []
-                scoreFP = []
-                scoreFN = []
-                scoreVN = []
-                for k in range(1,self.personCount+1):
-                    sumFP = 0
-                    sumVP = 0
-                    sumFN = 0
-                    sumVN = 0
-                    print("test de "+str(k))
-                    for i in range(1,self.imagePerPerson+1):
-                        VP,FP,FN,VN =self.testVPFP(k,i,seuil)
-                        sumVP +=VP
-                        sumFP +=FP
+        print("P="+str(P))
+        print("N="+str(N))
+        for seuil in range(500, 8000, 1000):
+            print("seuil="+str(seuil))
+            scoreVP = []
+            scoreFP = []
+            scoreFN = []
+            scoreVN = []
+            for k in range(1, self.personCount+1):
+                sumFP = 0
+                sumVP = 0
+                sumFN = 0
+                sumVN = 0
+                print("test de "+str(k))
+                for i in range(1, self.imagePerPerson+1):
+                    VP, FP, FN, VN = self.testVPFP(k, i, seuil)
+                    sumVP += VP
+                    sumFP += FP
 
-                        sumFN +=FN
-                        sumVN +=VN
-                    #print( (sumVP,sumFP))
-                    #scoreFP.append((noms[k],sumFP))
-                    scoreVP.append(sumVP)
-                    scoreFP.append(sumFP)
+                    sumFN += FN
+                    sumVN += VN
+                # print( (sumVP,sumFP))
+                # scoreFP.append((noms[k],sumFP))
+                scoreVP.append(sumVP)
+                scoreFP.append(sumFP)
 
-                    scoreVN.append(sumVN)
-                    scoreFN.append(sumFN)
+                scoreVN.append(sumVN)
+                scoreFN.append(sumFN)
 
-                VP =sum(i for i in scoreVP )
-                FP =sum(i for i in scoreFP )
+            VP = sum(i for i in scoreVP)
+            FP = sum(i for i in scoreFP)
 
-                VN =sum(i for i in scoreVN )
-                FN =sum(i for i in scoreFN )
-                print(VP)
-                print(FP)
-                print(FN)
-                print(VN)
+            VN = sum(i for i in scoreVN)
+            FN = sum(i for i in scoreFN)
+            print(VP)
+            print(FP)
+            print(FN)
+            print(VN)
 
+            FPR = FP/(totalImages*totalImages -
+                      self.imagePerPerson*totalImages)
+            sensi = VP/(totalImages*self.imagePerPerson)
+            speci = 1-FPR
+            TN = speci * N
 
-                FPR = FP/(totalImages*totalImages-self.imagePerPerson*totalImages)
-                sensi =VP/(totalImages*self.imagePerPerson)
-                speci = 1-FPR
-                TN = speci * N
+            ACC = (VP + VN) / ((P + N)*self.personCount)
+            print("accuracy : " + str(ACC))
 
-                ACC = (VP +VN ) / ((P +N)*self.personCount)
-                print("accuracy : " + str(ACC))
+            print("sensivity : " + str(sensi))
+            print("specificity: "+str(speci))
+            sens.write(str(seuil)+" "+str(sensi)+"\n")
+            spec.write(str(seuil)+" "+str(speci)+"\n")
 
-                print("sensivity : " + str(sensi))
-                print("specificity: "+str(speci))
-                sens.write(str(seuil)+" "+str(sensi)+"\n")
-                spec.write(str(seuil)+" "+str(speci)+"\n")
-                
-                final.write(str(seuil)+" "+str(ACC)+"\n")
-        
+            final.write(str(seuil)+" "+str(ACC)+"\n")
+
     def test4(self):
         seuil = 1250
-        for i in range(1,self.imagePerPerson+1):
-            print(self.testVPFP2(self.personCount + 1 , i, seuil))
+        for i in range(1, self.imagePerPerson+1):
+            print(self.testVPFP2(self.personCount + 1, i, seuil))
+
     def test5(self):
         seuil = 1500
-        for i in range(1,self.personCount+1):
-            print(self.testVPFP2( i , self.imagePerPerson+1, seuil))
+        for i in range(1, self.personCount+1):
+            print(self.testVPFP2(i, self.imagePerPerson+1, seuil))
 
     # def computeSensSpec():
     #     self.r = 6
@@ -516,13 +527,15 @@ class Reconnaissance:
     #         test2.write(str(seuil)+" "+str(speci+sensi)+"\n")
 
     def compute_and_display_ressemblance(self, other):
+        # Met à jour le seuil
+        self.seuil = int(self.spinBoxSeuil.get())
         distances = self.computeDistances()
         distances.sort()
         if other == 0:
             print("distance individuelle : ")
             self.printByName2(distances[:5])
 
-        #print("\n Nombre d'image par personne reconnue sous le seuil : ")
+        # print("\n Nombre d'image par personne reconnue sous le seuil : ")
         self.findSeuil2(distances)
 
         # distanceGroup.sort()
@@ -534,17 +547,26 @@ class Reconnaissance:
         # self.printByName(distanceGroup[:5])
 
         dist, ind = distances[0]
-        #name = self.noms[ind//5]
+        # name = self.noms[ind//5]
 
         name = self.noms[ind//self.imagePerPerson]
 
-        label_ressemblance.configure(
-            text="Ressemblance : " + name + " distance : " + str(dist))
+        if (dist < self.seuil):
+            label_ressemblance.configure(
+                text="Identification : " + name + "(" + str(int(dist)) + ")", fg="#20b02c")
+        else:
+            label_ressemblance.configure(
+                text="Inconnu : " + "(" + name + " " + str(int(dist)) + ")", fg="#b02020")
 
     def testImageR(self, autre):
 
-        if self.slider != None:
-            self.r = self.slider.get()
+        # if self.slider != None:
+        #     self.r = self.slider.get()
+        # else:
+        #     self.r = 8
+        # print(self.spinBoxDimension.get())
+        if self.spinBoxDimension != None:
+            self.r = int(self.spinBoxDimension.get())
         else:
             self.r = 8
 
@@ -569,7 +591,7 @@ class Reconnaissance:
         # configure the canvas item to use this image
         canvas_rec.itemconfigure(image_id_rec, image=canvas_rec.image_tk)
         # ---------------------------------------------------------------------------------------------
-        #testFaceMS = test(1)
+        # testFaceMS = test(1)
         # display(testFaceMS)
 
         self.compute_and_display_ressemblance(autre)
@@ -675,6 +697,41 @@ class Reconnaissance:
             20, lambda: self.show_frames_phone(i, une_frame_sur))
     #######################################################################################################################################################################
 
+    def show_spinboxes(self):
+        self.frameSpinbox = Frame(window)
+        self.labelDimension = Label(self.frameSpinbox, font=(
+            "Arial", 18), fg='Black', text="Dimension :")
+        self.labelDimension.grid(row=0, column=0, sticky=W, padx=10)
+        self.currentValueDimension = StringVar()
+        self.currentValueDimension.set("8")
+        self.spinBoxDimension = ttk.Spinbox(
+            self.frameSpinbox,
+            from_=0,
+            to=50,
+            textvariable=self.currentValueDimension,
+            command=lambda: self.testImageR(0),
+            width=5)
+
+        self.spinBoxDimension.grid(row=0, column=1, sticky=W, padx=10)
+        self.onlyOneSlider = True
+
+        self.labelSeuil = Label(self.frameSpinbox, font=(
+            "Arial", 18), fg='Black', text="Seuil :")
+        self.labelSeuil.grid(row=0, column=4, sticky=W, padx=10)
+        self.currentValueSeuil = StringVar()
+        self.currentValueSeuil.set("2700")
+        self.spinBoxSeuil = ttk.Spinbox(
+            self.frameSpinbox,
+            from_=0,
+            to=5000,
+            textvariable=self.currentValueSeuil,
+            command=lambda: self.compute_and_display_ressemblance(0),
+            width=5)
+
+        self.spinBoxSeuil.grid(row=0, column=5, sticky=W, padx=10)
+        self.frameSpinbox.pack(expand=YES)
+        self.onlyOneSlider = True
+
     def open_file(self):
         """Affiche la fenêtre d'ouverture de fichiers"""
         print("Open file")
@@ -696,33 +753,20 @@ class Reconnaissance:
 
             # Création slider
             if self.onlyOneSlider == False:
-                self.slider = Scale(window, from_=8, to=self.imagesCount, orient=HORIZONTAL,
-                                    command=self.testImageR)
+                self.show_spinboxes()
 
-                self.slider.pack(pady=10)
-                self.onlyOneSlider = True
             self.testImageR(autre=0)
 
     def open_webcam(self):
         if self.onlyOneSlider == False:
-            # Création slider
-            self.slider = Scale(window, from_=1, to=self.r, orient=HORIZONTAL,
-                                command=self.testImageR)
-
-            self.slider.pack(pady=10)
-            self.onlyOneSlider = True
+            self.show_spinboxes()
 
         # self.show_frames(0, 20)
         self.show_frames_aligned(0, 20)
 
     def open_phonecam(self):
         if self.onlyOneSlider == False:
-            # Création slider
-            self.slider = Scale(window, from_=1, to=self.r, orient=HORIZONTAL,
-                                command=self.testImageR)
-
-            self.slider.pack(pady=10)
-            self.onlyOneSlider = True
+            self.show_spinboxes()
 
         self.show_frames_phone(0, 20)
 
@@ -752,7 +796,8 @@ if __name__ == '__main__':
     reconnaissance = Reconnaissance(
         path, croppedResolution, noms, nImage, nPerson, nPerson*nImage)
 
-    cameraFeedURL = "https://192.168.1.23:8080/video"
+    # cameraFeedURL = "https://192.168.1.23:8080/video"
+    cameraFeedURL = "https://192.168.1.10:8080/video"
 
     window = Tk()
 
@@ -816,12 +861,11 @@ if __name__ == '__main__':
         label="Test2", command=reconnaissance.test2, accelerator="Ctrl+2")
     test_menu.add_command(
         label="Test3", command=reconnaissance.test3, accelerator="Ctrl+3")
-
-    file_menu.add_command(
-        label="Test4", command=reconnaissance.test4, accelerator="Ctrl+Z")
-    file_menu.add_command(
-        label="Test5", command=reconnaissance.test5, accelerator="Ctrl+Z")
-    file_menu.add_command(
+    test_menu.add_command(
+        label="Test4", command=reconnaissance.test4, accelerator="Ctrl+4")
+    test_menu.add_command(
+        label="Test5", command=reconnaissance.test5, accelerator="Ctrl+5")
+    test_menu.add_command(
         label="Quitter", command=window.quit, accelerator="Ctrl+Q")
     menu_bar.add_cascade(label="Fichier", menu=file_menu)
     menu_bar.add_cascade(label="Tests", menu=test_menu)
